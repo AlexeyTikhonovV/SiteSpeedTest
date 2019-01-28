@@ -1,0 +1,40 @@
+﻿@model IEnumerable<ParserSitemap.Models.UrlSite>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="row form-group">
+            <div class="col-md-5">
+                <h3>Site</h3>
+            </div>
+            <div class="col-md-2">
+                <h3>Date Test</h3>              
+            </div>
+            <div class="col-md-3 form-inline top-buffer">
+
+                @using (Html.BeginForm("Details", "Home", FormMethod.Get))
+                {
+                    @Html.DropDownList("type", Html.GetEnumSelectList<TimeOfDay>(),
+                    htmlAttributes: new { @class = "form-control" })
+
+                <input type="submit" value="Filter" class="btn btn-default" />
+                }
+            </div>
+        </div>
+        @foreach (var s in Model)
+        {
+            <div>
+                <a asp-controller="Home" asp-action="Result" asp-route-Id="@s.Id">
+                    <div class="row form-group">
+                        <div class="col-md-5">
+                            @s.SiteUrl
+                        </div>
+                        <div class="col-md-5">
+                            @s.Date
+                        </div>
+                        <hr />
+                    </div>
+                </a>
+            </div>
+        }
+    </div>
+</div>

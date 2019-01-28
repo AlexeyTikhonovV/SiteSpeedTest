@@ -1,0 +1,45 @@
+﻿@model IEnumerable<ParserSitemap.Models.DataUrl>
+
+@{
+    var XLabels = Newtonsoft.Json.JsonConvert.SerializeObject(Model);
+}
+<div class="container body-content">
+    <div class="row">
+        <canvas id="myChart" width="400" height="@ViewBag.h"></canvas>
+    </div>
+    <div>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>URL</th>
+                    <th>Request time</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            @if (Model != null)
+            {
+                foreach (var s in Model.OrderByDescending(d => d.Speed))
+                {
+                    <tbody>
+                        <tr>
+                            <td>@s.MapLink</td>
+                            <td>@s.Speed</td>
+                            <td>@s.Date</td>
+                        </tr>
+                    </tbody>
+                }
+            }
+        </table>
+    </div>
+</div>
+
+<script src="~/js/script.js"></script>
+<script>
+    var myChart = 'chart'
+
+    var ctx = document.getElementById("myChart").getContext('2d');
+    var params = createChartParams(@Html.Raw(XLabels))
+
+    var chart = new Chart(ctx, params);
+</script>
+
