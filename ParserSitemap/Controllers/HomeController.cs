@@ -5,7 +5,7 @@ using ParserSitemap.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Xml;
+using HtmlAgilityPack;
 
 namespace ParserSitemap.Controllers
 {
@@ -13,31 +13,15 @@ namespace ParserSitemap.Controllers
     {
         private UrlContext db;
         private double t;
-        const string Urlset = "urlset";
-        const string Sitemapindex = "sitemapindex";
-
+        private string ModUrl { get; set; }      
         public HomeController(UrlContext context)
         {
             db = context;
         }
 
-        public IActionResult Index(UrlSite urlSites, DataUrl dataUrl, string siteUrl) 
-        {      
-            var xmlDoc = new XmlDocument();
-            var time = new List<double>();
-
+        public IActionResult Index(UrlSite urlSites, DataUrl dataUrl, string siteUrl)
+        {
             if (siteUrl == null) return View();
-            string url = Helpers.GetSiteMapUrl(siteUrl);
-
-            try
-            {
-                xmlDoc.Load(url);
-            }
-            catch (Exception)
-            {
-                return BadRequest("Sorry, but we can't get the site map for this web site.");
-            }
-
             HttpContext.Session.SetString("Url", siteUrl);
 
             urlSites.SiteUrl = siteUrl;
@@ -45,7 +29,8 @@ namespace ParserSitemap.Controllers
             db.UrlSites.Add(urlSites);
             db.SaveChanges();
 
-            Parser(urlSites, xmlDoc, time);
+            string[] urls = BuildSitemap(urlSites);
+            RequestsUrl(urlSites, urls);
 
             return RedirectToAction("Result");
         }
@@ -56,9 +41,11 @@ namespace ParserSitemap.Controllers
 
             if (id != null)
             {
-                var data = db.DataUrls
-                    .Where(s => s.UrlSiteId == id);
-
+                var data = db.DataUrls 
+                    .Where(s => s.UrlSiteId == id)
+                    .GroupBy(p => p.MapLink)
+                    .Select(g => g.FirstOrDefault());
+                
                 var height = data.Count() * 5 + 20;
                 ViewBag.h = height;
 
@@ -71,14 +58,15 @@ namespace ParserSitemap.Controllers
                     .Select(s => s.Id).LastOrDefault();
 
                 var data = db.DataUrls
-                    .Where(s => s.UrlSiteId == sort);
+                    .Where(s => s.UrlSiteId == sort)
+                    .GroupBy(p => p.MapLink)
+                    .Select(g => g.FirstOrDefault());
 
                 var height = data.Count() * 5 + 20;
                 ViewBag.h = height;
 
                 return View(data);
             }
-
             return View();
         }
 
@@ -128,36 +116,76 @@ namespace ParserSitemap.Controllers
 
             return View(result);
         }
-
-        private void Parser(UrlSite urlSites, XmlDocument xmlDoc, List<double> time)
+        #region Helpers
+        private void ExtractAllAHrefTags(UrlSite urlSites, string urlToCheck, List<string> allurls)
         {
-            foreach (XmlNode topNode in xmlDoc.ChildNodes)
+            var currentUrl = HttpContext.Session.GetString("Url");
+
+            var pageContent = Requests.LoadPage(urlToCheck); 
+            if (pageContent != null)
             {
-                if (topNode.Name.ToLower() != Urlset && topNode.Name.ToLower() != Sitemapindex) continue;
-                var xml = new XmlNamespaceManager(xmlDoc.NameTable);
-                xml.AddNamespace("ns", topNode.NamespaceURI);
+                var document = new HtmlDocument();
+                document.LoadHtml(pageContent);
 
-                foreach (XmlNode urlNode in topNode.ChildNodes)
+                var hrefTags = new List<string>();
+
+                foreach (HtmlNode link in document.DocumentNode.SelectNodes("//a[@href]"))
                 {
-                    var locNode = urlNode.SelectSingleNode("ns:loc", xml); 
-                    if (locNode != null)
-                    {
-                        var timeSpan = Helpers.CheckLoadTime(locNode.InnerText);
-                        time.Add(timeSpan.TotalMilliseconds);
-                        var responseTime = timeSpan.TotalMilliseconds;
+                    HtmlAttribute att = link.Attributes["href"];
+                    hrefTags.Add(att.Value);
 
-                        var add = new DataUrl
+                    if (!(att.Value.Contains("#") || att.Value.Contains("skype:") || att.Value.Contains("javascript:") || att.Value.Contains("@")))
+                    {
+                        ModUrl = Helpers.GetSiteMapUrl(att.Value, currentUrl);
+                        if (!allurls.Contains(ModUrl))
                         {
-                            MapLink = locNode.InnerText,
-                            Speed = responseTime,
-                            Date = DateTime.Now,
-                            UrlSiteId = urlSites.Id
-                        };
-                        db.DataUrls.Add(add);
+                            allurls.Add(ModUrl);
+                        }
                     }
                 }
+            }
+        }
+
+        private string[] BuildSitemap(UrlSite urlSites)
+        {
+            var currentUrl = HttpContext.Session.GetString("Url");
+            List<string> allurls = new List<string>();
+            allurls.Add(currentUrl);
+            for (int i = 0; i < allurls.Count; i++)
+            {
+                string urlToCheck = allurls[i];
+                ExtractAllAHrefTags(urlSites, urlToCheck, allurls);
+            }
+
+            return allurls.ToArray();
+        }
+
+        private void RequestsUrl(UrlSite urlSites, string[] urls)
+        {
+            foreach (string url in urls)
+            {
+                var timeSpan = Requests.CheckLoadTime(url);
+                SaveUrl(urlSites, url, timeSpan);
+            }
+        }
+
+        private void SaveUrl(UrlSite urlSites, string RelativeToAbsolute, TimeSpan timeSpan)
+        {
+            if (RelativeToAbsolute != "")
+            {
+                var responseTime = timeSpan.TotalMilliseconds;
+
+                var add = new DataUrl
+                {
+                    MapLink = RelativeToAbsolute,
+                    Speed = responseTime,
+                    Date = DateTime.Now,
+                    UrlSiteId = urlSites.Id
+                };
+                db.DataUrls.Add(add);
                 db.SaveChanges();
             }
         }
+        #endregion 
     }
 }

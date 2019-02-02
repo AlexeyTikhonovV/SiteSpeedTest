@@ -1,41 +1,32 @@
-﻿using System;
-using System.Diagnostics;
-using System.Net;
-using System.Text.RegularExpressions;
-
-namespace ParserSitemap.Infrastructure
+﻿namespace ParserSitemap.Infrastructure
 {
     public class Helpers 
     {
-        public static string GetSiteMapUrl(string siteUrl) 
+        public static string GetSiteMapUrl(string siteUrl, string currentUrl)  
         {
-            const string siteMapPath = @"/sitemap.xml";
-            const string pattern = @"\/$";
-            const string target = "";
+            string res;
 
-            var regex = new Regex(pattern);
-            var result = regex.Replace(siteUrl, target); 
-            return result + siteMapPath;
-        }
-
-        public static TimeSpan CheckLoadTime(string url)  
-        {
-            var timer = new Stopwatch();
-            var request = WebRequest.Create(url);
-            TimeSpan responseTime;
-
-            try
+            if (!siteUrl.Contains("http://") && !siteUrl.Contains("https://"))
             {
-                timer.Start();
-                request.GetResponse();
-                timer.Stop();
-                responseTime = timer.Elapsed;
+                if (!siteUrl.StartsWith("/"))
+                {
+                    var site = "/" + siteUrl;
+                    res = currentUrl + site;
+                }
+                else
+                {
+                    res = currentUrl + siteUrl;
+                }
             }
-            catch (Exception)
+            else if(siteUrl.Contains(currentUrl))
             {
-                responseTime = TimeSpan.FromMilliseconds(0);
+                res = siteUrl;
             }
-            return responseTime;
-        }
+            else
+            {
+                res = "";
+            }
+            return res;
+        }        
     }
 }
