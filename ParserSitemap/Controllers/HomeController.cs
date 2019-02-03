@@ -6,14 +6,18 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using HtmlAgilityPack;
+using System.Text.RegularExpressions;
 
 namespace ParserSitemap.Controllers
 {
     public class HomeController : Controller
     {
         private UrlContext db;
-        private double t;
-        private string ModUrl { get; set; }      
+        private double filter; 
+        private string ModUrl { get; set; }
+        const string pattern = @"^\w+\:(?!\/)\#*.*$";
+        const string pattern1 = @"\s*#.+"; 
+
         public HomeController(UrlContext context)
         {
             db = context;
@@ -101,17 +105,17 @@ namespace ParserSitemap.Controllers
                     return View(allTime);
                 }
                 case 1:
-                    t = 0;
+                    filter = 0;
                     break;
                 case 2:
-                    t = -6;
+                    filter = -6;
                     break;              
             }
 
-            var dt = DateTime.Now.Date.AddDays(t);
+            var datetime = DateTime.Now.Date.AddDays(filter); 
 
             var result = db.UrlSites
-                .Where(x => x.Date >= dt && x.SiteUrl == currentUrl)
+                .Where(x => x.Date >= datetime && x.SiteUrl == currentUrl)
                 .OrderByDescending(h => h.Date); 
 
             return View(result);
@@ -120,6 +124,8 @@ namespace ParserSitemap.Controllers
         private void ExtractAllAHrefTags(UrlSite urlSites, string urlToCheck, List<string> allurls)
         {
             var currentUrl = HttpContext.Session.GetString("Url");
+            var regex = new Regex(pattern);
+            var regex1 = new Regex(pattern1); 
 
             var pageContent = Requests.LoadPage(urlToCheck); 
             if (pageContent != null)
@@ -127,22 +133,28 @@ namespace ParserSitemap.Controllers
                 var document = new HtmlDocument();
                 document.LoadHtml(pageContent);
 
-                var hrefTags = new List<string>();
-
-                foreach (HtmlNode link in document.DocumentNode.SelectNodes("//a[@href]"))
+                try
                 {
-                    HtmlAttribute att = link.Attributes["href"];
-                    hrefTags.Add(att.Value);
-
-                    if (!(att.Value.Contains("#") || att.Value.Contains("skype:") || att.Value.Contains("javascript:") || att.Value.Contains("@")))
+                    foreach (HtmlNode link in document.DocumentNode.SelectNodes("//a[@href]"))
                     {
-                        ModUrl = Helpers.GetSiteMapUrl(att.Value, currentUrl);
-                        if (!allurls.Contains(ModUrl))
+                        HtmlAttribute att = link.Attributes["href"];
+                        MatchCollection matches = regex.Matches(att.Value);
+
+                        if (matches.Count <= 0)
                         {
-                            allurls.Add(ModUrl);
+                            var remove = regex1.Replace(att.Value, string.Empty);
+                            ModUrl = Helpers.GetSiteMapUrl(remove, currentUrl);
+                            if (!allurls.Contains(ModUrl))
+                            {
+                                allurls.Add(ModUrl);
+                            }
                         }
                     }
                 }
+                catch
+                {
+                    allurls.Add(string.Empty);
+                }              
             }
         }
 
@@ -151,12 +163,14 @@ namespace ParserSitemap.Controllers
             var currentUrl = HttpContext.Session.GetString("Url");
             List<string> allurls = new List<string>();
             allurls.Add(currentUrl);
-            for (int i = 0; i < allurls.Count; i++)
+            for (int i = 0; i < allurls.Count ; i++)
             {
-                string urlToCheck = allurls[i];
-                ExtractAllAHrefTags(urlSites, urlToCheck, allurls);
+                if(allurls.Count <= 300)
+                {
+                    string urlToCheck = allurls[i];
+                    ExtractAllAHrefTags(urlSites, urlToCheck, allurls);
+                }
             }
-
             return allurls.ToArray();
         }
 

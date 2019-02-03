@@ -24,7 +24,7 @@
             }
             else
             {
-                res = "";
+                res = string.Empty;
             }
             return res;
         }        
