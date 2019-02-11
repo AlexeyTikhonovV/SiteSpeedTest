@@ -1,6 +1,8 @@
-﻿namespace ParserSitemap.Infrastructure
+﻿using System.Text.RegularExpressions;
+
+namespace ParserSitemap.Infrastructure
 {
-    public class Helpers 
+    public static class Helpers
     {
         public static string GetSiteMapUrl(string siteUrl, string currentUrl)  
         {

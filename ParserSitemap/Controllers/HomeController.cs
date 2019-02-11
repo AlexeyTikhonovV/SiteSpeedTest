@@ -16,7 +16,8 @@ namespace ParserSitemap.Controllers
         private double filter; 
         private string ModUrl { get; set; }
         const string pattern = @"^\w+\:(?!\/)\#*.*$";
-        const string pattern1 = @"\s*#.+"; 
+        const string pattern1 = @"\s*#.+";
+        const string pattern2 = @"\/$";
 
         public HomeController(UrlContext context)
         {
@@ -26,9 +27,12 @@ namespace ParserSitemap.Controllers
         public IActionResult Index(UrlSite urlSites, DataUrl dataUrl, string siteUrl)
         {
             if (siteUrl == null) return View();
-            HttpContext.Session.SetString("Url", siteUrl);
 
-            urlSites.SiteUrl = siteUrl;
+            var regex = new Regex(pattern2);
+            var remove = regex.Replace(siteUrl, string.Empty);
+            HttpContext.Session.SetString("Url", remove);
+
+            urlSites.SiteUrl = remove;
             urlSites.Date = DateTime.Now;
             db.UrlSites.Add(urlSites);
             db.SaveChanges();
@@ -143,7 +147,7 @@ namespace ParserSitemap.Controllers
                         if (matches.Count <= 0)
                         {
                             var remove = regex1.Replace(att.Value, string.Empty);
-                            ModUrl = Helpers.GetSiteMapUrl(remove, currentUrl);
+                            ModUrl = Helpers.GetSiteMapUrl(remove, currentUrl); 
                             if (!allurls.Contains(ModUrl))
                             {
                                 allurls.Add(ModUrl);

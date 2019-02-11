@@ -6,7 +6,7 @@ using System.Text;
 
 namespace ParserSitemap.Infrastructure
 {
-    public class Requests 
+    public class Requests  
     {
         public static TimeSpan CheckLoadTime(string url)
         {
